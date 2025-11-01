@@ -50,7 +50,7 @@ cv2.namedWindow("Resultado (Cor isolada)") # <-- Janela reativada
 
 # Cria trackbars
 cv2.createTrackbar("H_min", "Trackbars", 0, 179, nada)
-cv2.createTrackbar("H_max", "Trackbars", 179, 179, nada)
+cv2.createTrackbar("H_max", "Trackbars", 255, 255, nada)
 cv2.createTrackbar("S_min", "Trackbars", 0, 255, nada)
 cv2.createTrackbar("S_max", "Trackbars", 255, 255, nada)
 cv2.createTrackbar("V_min", "Trackbars", 0, 255, nada)

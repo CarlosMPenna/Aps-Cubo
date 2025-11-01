@@ -1,4 +1,4 @@
-# salve como solver_interativo_setas_debug.py
+# salve como solver_interativo_setas.py
 import cv2
 import numpy as np
 import kociemba
@@ -10,7 +10,7 @@ from scipy import stats  # Para ajudar na estabilidade da detecção
 print("--- Iniciando Script ---")  # DEBUG 1
 
 # --- 1. Carregar Valores Calibrados ---
-# Tenta importar os valores salvos pelo calibrador_com_save.py
+# (Nenhuma alteração nesta seção)
 try:
     if os.path.exists("calibrated_colors.py"):
         from calibrated_colors import calibrated_values
@@ -77,6 +77,7 @@ print("DEBUG: Configurações definidas.")  # DEBUG 3 (Fim)
 
 
 # --- 3. Funções Auxiliares ---
+# (Nenhuma alteração nesta seção)
 print("DEBUG: Definindo Funções Auxiliares...")  # DEBUG 4
 
 def get_color_name(hsv_pixel):
@@ -285,223 +286,469 @@ arrows = {
            ((center_points[2][0], center_points[2][1]-10), (center_points[0][0]+10, center_points[0][1])),
            ((center_points[8][0]-10, center_points[8][1]), (center_points[2][0], center_points[2][1]+10))],
     "B": [], "B'": [], "B2": [],
-    "TURN_R": [(center_points[8], center_points[6]), (center_points[5], center_points[3]), (center_points[2], center_points[0])],
-    "TURN_L": [(center_points[6], center_points[8]), (center_points[3], center_points[5]), (center_points[0], center_points[2])],
+    # <--- CORRIGIDO: Setas de giro do cubo estavam trocadas ---
+    "TURN_R": [(center_points[6], center_points[8]), (center_points[3], center_points[5]), (center_points[0], center_points[2])],
+    "TURN_L": [(center_points[8], center_points[6]), (center_points[5], center_points[3]), (center_points[2], center_points[0])],
 }
 
-# --- Funções de Rotação Lógica (Modificadas para checar Nones) ---
+# --- Funções de Rotação Lógica ---
+
 def right_cw(video, u, r, f, d, l, b, *args):
+    # R (CW): U -> F -> D -> B(inv) -> U
     if any(face is None for face in [u, r, f, d, b]): print("DEBUG: right_cw recebeu None."); return u, r, f, d, l, b
+    
     f_before = np.copy(f)
+    u_before = np.copy(u)
+    d_before = np.copy(d)
+    b_before = np.copy(b)
+    
     expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
-    expected_f[0, [2, 5, 8]] = d[0, [2, 5, 8]]
-    expected_d[0, [2, 5, 8]] = b[0, [6, 3, 0]]
-    expected_b[0, [6, 3, 0]] = u[0, [2, 5, 8]]
+
     expected_u[0, [2, 5, 8]] = f_before[0, [2, 5, 8]]
+    expected_f[0, [2, 5, 8]] = d_before[0, [2, 5, 8]]
+    expected_d[0, [2, 5, 8]] = b_before[0, [6, 3, 0]]
+    expected_b[0, [6, 3, 0]] = u_before[0, [2, 5, 8]]
+
     rotated_r = rotate_cw(r)
     if rotated_r is None: print("DEBUG: rotate_cw(r) falhou."); return u, r, f, d, l, b
     expected_r = rotated_r
+    
     if wait_for_move(video, expected_f, f_before, "R", arrows["R"]):
         return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
-    else: return u, r, f, d, l, b
+    else: 
+        return u, r, f, d, l, b
 
 def right_ccw(video, u, r, f, d, l, b, *args):
+    # R' (CCW): U -> B(inv) -> D -> F -> U
     if any(face is None for face in [u, r, f, d, b]): print("DEBUG: right_ccw recebeu None."); return u, r, f, d, l, b
+    
     f_before = np.copy(f)
+    u_before = np.copy(u)
+    d_before = np.copy(d)
+    b_before = np.copy(b)
+    
     expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
-    expected_f[0, [2, 5, 8]] = u[0, [2, 5, 8]]
-    expected_u[0, [2, 5, 8]] = b[0, [6, 3, 0]]
-    expected_b[0, [6, 3, 0]] = d[0, [2, 5, 8]]
+
+    expected_u[0, [2, 5, 8]] = b_before[0, [6, 3, 0]]
+    expected_f[0, [2, 5, 8]] = u_before[0, [2, 5, 8]]
     expected_d[0, [2, 5, 8]] = f_before[0, [2, 5, 8]]
+    expected_b[0, [6, 3, 0]] = d_before[0, [2, 5, 8]]
+
     rotated_r = rotate_ccw(r)
     if rotated_r is None: print("DEBUG: rotate_ccw(r) falhou."); return u, r, f, d, l, b
     expected_r = rotated_r
+    
     if wait_for_move(video, expected_f, f_before, "R'", arrows["R'"]):
         return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
-    else: return u, r, f, d, l, b
+    else: 
+        return u, r, f, d, l, b
 
 def left_cw(video, u, r, f, d, l, b, *args):
+    # L (CW): U -> B(inv) -> D -> F -> U
     if any(face is None for face in [u, l, f, d, b]): print("DEBUG: left_cw recebeu None."); return u, r, f, d, l, b
+    
     f_before = np.copy(f)
+    u_before = np.copy(u)
+    d_before = np.copy(d)
+    b_before = np.copy(b)
+
     expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
-    expected_f[0, [0, 3, 6]] = u[0, [0, 3, 6]]
-    expected_u[0, [0, 3, 6]] = b[0, [8, 5, 2]]
-    expected_b[0, [8, 5, 2]] = d[0, [0, 3, 6]]
+
+    expected_u[0, [0, 3, 6]] = b_before[0, [8, 5, 2]]
+    expected_f[0, [0, 3, 6]] = u_before[0, [0, 3, 6]]
     expected_d[0, [0, 3, 6]] = f_before[0, [0, 3, 6]]
+    expected_b[0, [8, 5, 2]] = d_before[0, [0, 3, 6]]
+
     rotated_l = rotate_cw(l)
     if rotated_l is None: print("DEBUG: rotate_cw(l) falhou."); return u, r, f, d, l, b
     expected_l = rotated_l
+    
     if wait_for_move(video, expected_f, f_before, "L", arrows["L"]):
         return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
-    else: return u, r, f, d, l, b
+    else: 
+        return u, r, f, d, l, b
 
 def left_ccw(video, u, r, f, d, l, b, *args):
+    # L' (CCW): U -> F -> D -> B(inv) -> U
     if any(face is None for face in [u, l, f, d, b]): print("DEBUG: left_ccw recebeu None."); return u, r, f, d, l, b
+    
     f_before = np.copy(f)
+    u_before = np.copy(u)
+    d_before = np.copy(d)
+    b_before = np.copy(b)
+    
     expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
-    expected_f[0, [0, 3, 6]] = d[0, [0, 3, 6]]
-    expected_d[0, [0, 3, 6]] = b[0, [8, 5, 2]]
-    expected_b[0, [8, 5, 2]] = u[0, [0, 3, 6]]
+
     expected_u[0, [0, 3, 6]] = f_before[0, [0, 3, 6]]
+    expected_f[0, [0, 3, 6]] = d_before[0, [0, 3, 6]]
+    expected_d[0, [0, 3, 6]] = b_before[0, [8, 5, 2]]
+    expected_b[0, [8, 5, 2]] = u_before[0, [0, 3, 6]]
+
     rotated_l = rotate_ccw(l)
     if rotated_l is None: print("DEBUG: rotate_ccw(l) falhou."); return u, r, f, d, l, b
     expected_l = rotated_l
+    
     if wait_for_move(video, expected_f, f_before, "L'", arrows["L'"]):
         return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
-    else: return u, r, f, d, l, b
+    else: 
+        return u, r, f, d, l, b
 
 def up_cw(video, u, r, f, d, l, b, *args):
+    # U (CW): F -> L -> B -> R -> F
     if any(face is None for face in [u, r, f, l, b]): print("DEBUG: up_cw recebeu None."); return u, r, f, d, l, b
+    
     f_before = np.copy(f)
+    r_before = np.copy(r)
+    l_before = np.copy(l)
+    b_before = np.copy(b)
+    
     expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
-    expected_f[0, [0, 1, 2]] = r[0, [0, 1, 2]]
-    expected_r[0, [0, 1, 2]] = b[0, [0, 1, 2]]
-    expected_b[0, [0, 1, 2]] = l[0, [0, 1, 2]]
+    
+    expected_f[0, [0, 1, 2]] = r_before[0, [0, 1, 2]]
+    expected_r[0, [0, 1, 2]] = b_before[0, [0, 1, 2]]
+    expected_b[0, [0, 1, 2]] = l_before[0, [0, 1, 2]]
     expected_l[0, [0, 1, 2]] = f_before[0, [0, 1, 2]]
+
     rotated_u = rotate_cw(u)
     if rotated_u is None: print("DEBUG: rotate_cw(u) falhou."); return u, r, f, d, l, b
     expected_u = rotated_u
+    
     if wait_for_move(video, expected_f, f_before, "U", arrows["U"]):
         return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
-    else: return u, r, f, d, l, b
+    else: 
+        return u, r, f, d, l, b
 
 def up_ccw(video, u, r, f, d, l, b, *args):
+    # U' (CCW): F -> R -> B -> L -> F
     if any(face is None for face in [u, r, f, l, b]): print("DEBUG: up_ccw recebeu None."); return u, r, f, d, l, b
+    
     f_before = np.copy(f)
+    r_before = np.copy(r)
+    l_before = np.copy(l)
+    b_before = np.copy(b)
+
     expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
-    expected_f[0, [0, 1, 2]] = l[0, [0, 1, 2]]
-    expected_l[0, [0, 1, 2]] = b[0, [0, 1, 2]]
-    expected_b[0, [0, 1, 2]] = r[0, [0, 1, 2]]
+
+    expected_f[0, [0, 1, 2]] = l_before[0, [0, 1, 2]]
+    expected_l[0, [0, 1, 2]] = b_before[0, [0, 1, 2]]
+    expected_b[0, [0, 1, 2]] = r_before[0, [0, 1, 2]]
     expected_r[0, [0, 1, 2]] = f_before[0, [0, 1, 2]]
+
     rotated_u = rotate_ccw(u)
     if rotated_u is None: print("DEBUG: rotate_ccw(u) falhou."); return u, r, f, d, l, b
     expected_u = rotated_u
+    
     if wait_for_move(video, expected_f, f_before, "U'", arrows["U'"]):
         return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
-    else: return u, r, f, d, l, b
+    else: 
+        return u, r, f, d, l, b
 
 def down_cw(video, u, r, f, d, l, b, *args):
+    # D (CW): F -> R -> B -> L -> F
     if any(face is None for face in [d, r, f, l, b]): print("DEBUG: down_cw recebeu None."); return u, r, f, d, l, b
+    
     f_before = np.copy(f)
+    r_before = np.copy(r)
+    l_before = np.copy(l)
+    b_before = np.copy(b)
+    
     expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
-    expected_f[0, [6, 7, 8]] = l[0, [6, 7, 8]]
-    expected_l[0, [6, 7, 8]] = b[0, [6, 7, 8]]
-    expected_b[0, [6, 7, 8]] = r[0, [6, 7, 8]]
+    
+    expected_f[0, [6, 7, 8]] = l_before[0, [6, 7, 8]]
+    expected_l[0, [6, 7, 8]] = b_before[0, [6, 7, 8]]
+    expected_b[0, [6, 7, 8]] = r_before[0, [6, 7, 8]]
     expected_r[0, [6, 7, 8]] = f_before[0, [6, 7, 8]]
+    
     rotated_d = rotate_cw(d)
     if rotated_d is None: print("DEBUG: rotate_cw(d) falhou."); return u, r, f, d, l, b
     expected_d = rotated_d
+    
     if wait_for_move(video, expected_f, f_before, "D", arrows["D"]):
         return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
-    else: return u, r, f, d, l, b
+    else: 
+        return u, r, f, d, l, b
 
 def down_ccw(video, u, r, f, d, l, b, *args):
+    # D' (CCW): F -> L -> B -> R -> F
     if any(face is None for face in [d, r, f, l, b]): print("DEBUG: down_ccw recebeu None."); return u, r, f, d, l, b
+    
     f_before = np.copy(f)
+    r_before = np.copy(r)
+    l_before = np.copy(l)
+    b_before = np.copy(b)
+
     expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
-    expected_f[0, [6, 7, 8]] = r[0, [6, 7, 8]]
-    expected_r[0, [6, 7, 8]] = b[0, [6, 7, 8]]
-    expected_b[0, [6, 7, 8]] = l[0, [6, 7, 8]]
+
+    expected_f[0, [6, 7, 8]] = r_before[0, [6, 7, 8]]
+    expected_r[0, [6, 7, 8]] = b_before[0, [6, 7, 8]]
+    expected_b[0, [6, 7, 8]] = l_before[0, [6, 7, 8]]
     expected_l[0, [6, 7, 8]] = f_before[0, [6, 7, 8]]
+    
     rotated_d = rotate_ccw(d)
     if rotated_d is None: print("DEBUG: rotate_ccw(d) falhou."); return u, r, f, d, l, b
     expected_d = rotated_d
+    
     if wait_for_move(video, expected_f, f_before, "D'", arrows["D'"]):
         return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
-    else: return u, r, f, d, l, b
+    else: 
+        return u, r, f, d, l, b
 
 def front_cw(video, u, r, f, d, l, b, *args):
+    # F (CW): U -> R -> D(inv) -> L -> U
     if any(face is None for face in [u, r, f, d, l]): print("DEBUG: front_cw recebeu None."); return u, r, f, d, l, b
+    
     f_before = np.copy(f)
-    expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
     u_before = np.copy(u)
-    expected_u[0, [6, 7, 8]] = l[0, [8, 5, 2]]
-    expected_l[0, [2, 5, 8]] = d[0, [0, 1, 2]]
-    expected_d[0, [0, 1, 2]] = r[0, [6, 3, 0]]
-    expected_r[0, [0, 3, 6]] = u_before[0, [6, 7, 8]]
+    r_before = np.copy(r)
+    d_before = np.copy(d)
+    l_before = np.copy(l)
+    
+    expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
+
+    expected_u[0, [6, 7, 8]] = l_before[0, [8, 5, 2]] # U[6,7,8] <- L[8,5,2]
+    expected_r[0, [0, 3, 6]] = u_before[0, [6, 7, 8]] # R[0,3,6] <- U[6,7,8]
+    expected_d[0, [0, 1, 2]] = r_before[0, [6, 3, 0]] # D[0,1,2] <- R[6,3,0]
+    expected_l[0, [2, 5, 8]] = d_before[0, [0, 1, 2]] # L[2,5,8] <- D[0,1,2]
+
     rotated_f = rotate_cw(f)
     if rotated_f is None: print("DEBUG: rotate_cw(f) falhou."); return u, r, f, d, l, b
     expected_f = rotated_f
+    
     if wait_for_move(video, expected_f, f_before, "F", arrows["F"]):
         return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
-    else: return u, r, f, d, l, b
+    else: 
+        return u, r, f, d, l, b
 
 def front_ccw(video, u, r, f, d, l, b, *args):
+    # F' (CCW): U -> L -> D(inv) -> R -> U
     if any(face is None for face in [u, r, f, d, l]): print("DEBUG: front_ccw recebeu None."); return u, r, f, d, l, b
+    
     f_before = np.copy(f)
-    expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
     u_before = np.copy(u)
-    expected_u[0, [6, 7, 8]] = r[0, [0, 3, 6]]
-    expected_r[0, [6, 3, 0]] = d[0, [0, 1, 2]]
-    expected_d[0, [0, 1, 2]] = l[0, [2, 5, 8]]
+    r_before = np.copy(r)
+    d_before = np.copy(d)
+    l_before = np.copy(l)
+
+    expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
+
+    expected_u[0, [6, 7, 8]] = r_before[0, [0, 3, 6]]
+    expected_r[0, [6, 3, 0]] = d_before[0, [0, 1, 2]]
+    expected_d[0, [0, 1, 2]] = l_before[0, [2, 5, 8]]
     expected_l[0, [8, 5, 2]] = u_before[0, [6, 7, 8]]
+
     rotated_f = rotate_ccw(f)
     if rotated_f is None: print("DEBUG: rotate_ccw(f) falhou."); return u, r, f, d, l, b
     expected_f = rotated_f
+    
     if wait_for_move(video, expected_f, f_before, "F'", arrows["F'"]):
         return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
-    else: return u, r, f, d, l, b
+    else: 
+        return u, r, f, d, l, b
 
 def back_cw(video, u, r, f, d, l, b, *args):
+    # B (CW): U -> L -> D(inv) -> R -> U
+    # Esta função só é usada para cálculo interno, não para wait_for_move
     if any(face is None for face in [u, r, d, l, b]): print("DEBUG: back_cw recebeu None."); return u, r, f, d, l, b
-    f_before = np.copy(f)
-    expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
+    
     u_before = np.copy(u)
-    expected_u[0, [0, 1, 2]] = r[0, [2, 5, 8]]
-    expected_r[0, [2, 5, 8]] = d[0, [8, 7, 6]]
-    expected_d[0, [8, 7, 6]] = l[0, [6, 3, 0]]
+    r_before = np.copy(r)
+    d_before = np.copy(d)
+    l_before = np.copy(l)
+
+    expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
+
+    expected_u[0, [0, 1, 2]] = r_before[0, [2, 5, 8]]
+    expected_r[0, [2, 5, 8]] = d_before[0, [8, 7, 6]]
+    expected_d[0, [8, 7, 6]] = l_before[0, [6, 3, 0]]
     expected_l[0, [6, 3, 0]] = u_before[0, [0, 1, 2]]
+
     rotated_b = rotate_cw(b)
     if rotated_b is None: print("DEBUG: rotate_cw(b) falhou."); return u, r, f, d, l, b
     expected_b = rotated_b
-    if wait_for_move(video, expected_f, f_before, "B", arrows["B"]):
-        return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
-    else: return u, r, f, d, l, b
+    
+    return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
+
 
 def back_ccw(video, u, r, f, d, l, b, *args):
+    # B' (CCW): U -> R -> D(inv) -> L -> U
+    # Esta função só é usada para cálculo interno, não para wait_for_move
     if any(face is None for face in [u, r, d, l, b]): print("DEBUG: back_ccw recebeu None."); return u, r, f, d, l, b
-    f_before = np.copy(f)
-    expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
+    
     u_before = np.copy(u)
-    expected_u[0, [0, 1, 2]] = l[0, [6, 3, 0]]
-    expected_l[0, [6, 3, 0]] = d[0, [8, 7, 6]]
-    expected_d[0, [8, 7, 6]] = r[0, [2, 5, 8]]
+    r_before = np.copy(r)
+    d_before = np.copy(d)
+    l_before = np.copy(l)
+
+    expected_u, expected_r, expected_f, expected_d, expected_l, expected_b = np.copy(u), np.copy(r), np.copy(f), np.copy(d), np.copy(l), np.copy(b)
+    
+    expected_u[0, [0, 1, 2]] = l_before[0, [6, 3, 0]]
+    expected_l[0, [6, 3, 0]] = d_before[0, [8, 7, 6]]
+    expected_d[0, [8, 7, 6]] = r_before[0, [2, 5, 8]]
     expected_r[0, [2, 5, 8]] = u_before[0, [0, 1, 2]]
+
     rotated_b = rotate_ccw(b)
     if rotated_b is None: print("DEBUG: rotate_ccw(b) falhou."); return u, r, f, d, l, b
     expected_b = rotated_b
-    if wait_for_move(video, expected_f, f_before, "B'", arrows["B'"]):
-        return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
-    else: return u, r, f, d, l, b
+    
+    return expected_u, expected_r, expected_f, expected_d, expected_l, expected_b
 
+# <--- CORRIGIDO: Funções de giro do cubo com lógica e nomes trocados ---
 
-# Funções para virar o cubo inteiro (simplificado)
+# Y (CW, Horário): F->R, R->B, B->L, L->F
 def turn_cube_Y(video, u, r, f, d, l, b, *args):
-    if any(face is None for face in [u, r, f, d, l, b]): print("DEBUG: turn_Y recebeu None."); return u, r, f, d, l, b
+    if any(face is None for face in [u, r, f, d, l, b]): print("DEBUG: turn_Y (Girar Direita) recebeu None."); return u, r, f, d, l, b
     print("Vire o cubo todo para a DIREITA (Y)")
-    new_f, new_r, new_b, new_l = l, f, r, b
-    rotated_u = rotate_cw(u)
-    rotated_d = rotate_ccw(d)
+    f_before = np.copy(f) # Salva a face F (Front) original
+
+    # Lógica Y (Horário): F->R, R->B, B->L, L->F
+    new_f, new_r, new_b, new_l = r, b, l, f
+
+    rotated_u = rotate_cw(u)  # U gira horário
+    rotated_d = rotate_ccw(d) # D gira anti-horário (visto de D)
     if rotated_u is None or rotated_d is None: print("DEBUG: rotação U/D falhou em turn_Y."); return u, r, f, d, l, b
     new_u, new_d = rotated_u, rotated_d
-    print("Mostre a nova FACE FRONTAL (que era a Esquerda)")
-    if wait_for_move(video, new_f, l, "VIRAR P/ DIREITA: Mostre a nova face F", arrows["TURN_R"]):
+
+    print("Mostre a nova FACE FRONTAL (que era a Direita)")
+    # Esperamos ver a face 'R' original, que é 'new_f'
+    if wait_for_move(video, new_f, f_before, "VIRAR P/ DIREITA: Mostre a nova face F", arrows["TURN_R"]):
         return new_u, new_r, new_f, new_d, new_l, new_b
     else: return u, r, f, d, l, b
 
-
+# Y' (CCW, Anti-horário): F->L, L->B, B->R, R->F
 def turn_cube_Y_prime(video, u, r, f, d, l, b, *args):
-    if any(face is None for face in [u, r, f, d, l, b]): print("DEBUG: turn_Y' recebeu None."); return u, r, f, d, l, b
+    if any(face is None for face in [u, r, f, d, l, b]): print("DEBUG: turn_Y' (Girar Esquerda) recebeu None."); return u, r, f, d, l, b
     print("Vire o cubo todo para a ESQUERDA (Y')")
-    new_f, new_l, new_b, new_r = r, f, l, b
-    rotated_u = rotate_ccw(u)
-    rotated_d = rotate_cw(d)
+    f_before = np.copy(f) # Salva a face F (Front) original
+
+    # Lógica Y' (Anti-horário): F->L, L->B, B->R, R->F
+    new_f, new_r, new_b, new_l = l, f, r, b
+
+    rotated_u = rotate_ccw(u) # U gira anti-horário
+    rotated_d = rotate_cw(d)  # D gira horário (visto de D)
     if rotated_u is None or rotated_d is None: print("DEBUG: rotação U/D falhou em turn_Y'."); return u, r, f, d, l, b
     new_u, new_d = rotated_u, rotated_d
-    print("Mostre a nova FACE FRONTAL (que era a Direita)")
-    if wait_for_move(video, new_f, r, "VIRAR P/ ESQUERDA: Mostre a nova face F", arrows["TURN_L"]):
+
+    print("Mostre a nova FACE FRONTAL (que era a Esquerda)")
+    # Esperamos ver a face 'L' original, que é 'new_f'
+    if wait_for_move(video, new_f, f_before, "VIRAR P/ ESQUERDA: Mostre a nova face F", arrows["TURN_L"]):
         return new_u, new_r, new_f, new_d, new_l, new_b
     else: return u, r, f, d, l, b
+
+
+# <--- INÍCIO DAS NOVAS FUNÇÕES WRAPPER (CORRIGIDAS) ---
+# A lógica de conversão correta é:
+# B  = Y  R' Y'
+# B' = Y  R  Y'
+# B2 = Y  R2 Y'
+
+def handle_back_cw(video, u, r, f, d, l, b, *args):
+    """
+    Executa um movimento B (CW) usando a conversão: Y  R' Y'
+    (Gira Direita, R anti-horário, Gira Esquerda)
+    """
+    print("INFO: Movimento 'B' (Trás) solicitado. Reorientando o cubo...")
+    
+    # 1. Turn Cube Y (Girar para Direita)
+    # new_F = old_R, new_R = old_B, new_B = old_L, new_L = old_F
+    new_u, new_r, new_f, new_d, new_l, new_b = turn_cube_Y(video, u, r, f, d, l, b, *args)
+    if np.array_equal(new_f, f): # Checa se a rotação Y foi interrompida
+        print("DEBUG: Rotação Y interrompida.")
+        return u, r, f, d, l, b # Retorna estado original para a main() detectar
+
+    # 2. Executar R' (movimento B convertido)
+    print("INFO: Executando 'R'' (que é o 'B' original)")
+    u2, r2, f2, d2, l2, b2 = right_ccw(video, new_u, new_r, new_f, new_d, new_l, new_b, *args)
+
+    if np.array_equal(f2, new_f): # Interrompeu no R'
+        print("DEBUG: Movimento 'R'' (convertido) interrompido. Desfazendo rotação Y...")
+        # Gira de volta ANTES de retornar
+        u3, r3, f3, d3, l3, b3 = turn_cube_Y_prime(video, new_u, new_r, new_f, new_d, new_l, new_b, *args)
+        return u, r, f, d, l, b # Retorna estado original TOTAL
+
+    # 3. Turn Cube Y' (Girar de volta)
+    print("INFO: Retornando à face frontal original...")
+    u3, r3, f3, d3, l3, b3 = turn_cube_Y_prime(video, u2, r2, f2, d2, l2, b2, *args)
+
+    if np.array_equal(f3, f2): # Interrompeu no Y' de volta
+        print("DEBUG: Rotação Y' (retorno) interrompida.")
+        return u, r, f, d, l, b 
+
+    return u3, r3, f3, d3, l3, b3 # Retorna estado final corrigido
+
+def handle_back_ccw(video, u, r, f, d, l, b, *args):
+    """
+    Executa um movimento B' (CCW) usando a conversão: Y  R  Y'
+    (Gira Direita, R horário, Gira Esquerda)
+    """
+    print("INFO: Movimento 'B'' (Trás) solicitado. Reorientando o cubo...")
+    
+    # 1. Turn Cube Y (Girar para Direita)
+    new_u, new_r, new_f, new_d, new_l, new_b = turn_cube_Y(video, u, r, f, d, l, b, *args)
+    if np.array_equal(new_f, f): # Interrompeu no turn_Y
+        print("DEBUG: Rotação Y interrompida.")
+        return u, r, f, d, l, b 
+
+    # 2. Executar R (movimento B' convertido)
+    print("INFO: Executando 'R' (que é o 'B'' original)")
+    u2, r2, f2, d2, l2, b2 = right_cw(video, new_u, new_r, new_f, new_d, new_l, new_b, *args)
+
+    if np.array_equal(f2, new_f): # Interrompeu no R
+        print("DEBUG: Movimento 'R' (convertido) interrompido. Desfazendo rotação Y...")
+        u3, r3, f3, d3, l3, b3 = turn_cube_Y_prime(video, new_u, new_r, new_f, new_d, new_l, new_b, *args)
+        return u, r, f, d, l, b 
+
+    # 3. Turn Cube Y' (Girar de volta)
+    print("INFO: Retornando à face frontal original...")
+    u3, r3, f3, d3, l3, b3 = turn_cube_Y_prime(video, u2, r2, f2, d2, l2, b2, *args)
+
+    if np.array_equal(f3, f2): # Interrompeu no Y' de volta
+        print("DEBUG: Rotação Y' (retorno) interrompida.")
+        return u, r, f, d, l, b 
+
+    return u3, r3, f3, d3, l3, b3
+
+def handle_back_2(video, u, r, f, d, l, b, *args):
+    """
+    Executa um movimento B2 usando a conversão: Y  R2  Y'
+    (Gira Direita, R2, Gira Esquerda)
+    """
+    print("INFO: Movimento 'B2' (Trás) solicitado. Reorientando o cubo...")
+
+    # 1. Turn Cube Y (Girar para Direita)
+    new_u, new_r, new_f, new_d, new_l, new_b = turn_cube_Y(video, u, r, f, d, l, b, *args)
+    if np.array_equal(new_f, f): # Interrompeu no turn_Y
+        print("DEBUG: Rotação Y interrompida.")
+        return u, r, f, d, l, b 
+
+    # 2. Executar R2 (movimento B2 convertido)
+    print("INFO: Executando 'R2' (que é o 'B2' original)")
+    # R2 = R + R
+    u_temp, r_temp, f_temp, d_temp, l_temp, b_temp = right_cw(video, new_u, new_r, new_f, new_d, new_l, new_b, *args)
+    
+    if np.array_equal(f_temp, new_f): # Checa interrupção no primeiro R
+        print("DEBUG: Movimento 'R' (1/2 de R2) interrompido. Desfazendo rotação Y...")
+        u3, r3, f3, d3, l3, b3 = turn_cube_Y_prime(video, new_u, new_r, new_f, new_d, new_l, new_b, *args)
+        return u, r, f, d, l, b # Retorna estado original TOTAL
+    
+    # Segundo R
+    u2, r2, f2, d2, l2, b2 = right_cw(video, u_temp, r_temp, f_temp, d_temp, l_temp, b_temp, *args)
+
+    if np.array_equal(f2, f_temp): # Checa interrupção no segundo R
+        print("DEBUG: Movimento 'R' (2/2 de R2) interrompido. Desfazendo rotação Y...")
+        u3, r3, f3, d3, l3, b3 = turn_cube_Y_prime(video, u_temp, r_temp, f_temp, d_temp, l_temp, b_temp, *args)
+        return u, r, f, d, l, b
+
+    # 3. Turn Cube Y' (Girar de volta)
+    print("INFO: Retornando à face frontal original...")
+    u3, r3, f3, d3, l3, b3 = turn_cube_Y_prime(video, u2, r2, f2, d2, l2, b2, *args)
+
+    if np.array_equal(f3, f2): # Interrompeu no Y' de volta
+        print("DEBUG: Rotação Y' (retorno) interrompida.")
+        return u, r, f, d, l, b
+
+    return u3, r3, f3, d3, l3, b3
+# <--- FIM DAS NOVAS FUNÇÕES WRAPPER ---
+
 
 # Mapeamento de strings de movimento para funções
 move_functions = {
@@ -510,14 +757,22 @@ move_functions = {
     "U": up_cw,    "U'": up_ccw,
     "D": down_cw,  "D'": down_ccw,
     "F": front_cw, "F'": front_ccw,
-    "B": back_cw,  "B'": back_ccw,
+    # As funções B originais não são mais necessárias aqui
 }
-# Adiciona movimentos duplos (X2) dinamicamente
+
+# Adiciona movimentos duplos (X2) dinamicamente para R,L,U,D,F
 for move in list(move_functions.keys()):
     if "'" not in move:
         func = move_functions[move]
         move_functions[move + "2"] = lambda v, u, r, f, d, l, b, *a, _func=func: \
-                                     _func(v, *_func(v, u, r, f, d, l, b, *a), *a)
+                                        _func(v, *_func(v, u, r, f, d, l, b, *a), *a)
+
+# Adiciona os handlers de 'B' manualmente
+move_functions["B"] = handle_back_cw
+move_functions["B'"] = handle_back_ccw
+move_functions["B2"] = handle_back_2
+
+
 
 print("DEBUG: Funções interativas definidas.")  # DEBUG 5 (Fim)
 
@@ -527,7 +782,7 @@ def main():
     global num_to_kociemba_letter, kociemba_letter_to_num
 
     print("DEBUG: Entrando na função main()")  # DEBUG 6
-    video = cv2.VideoCapture(0)
+    video = cv2.VideoCapture(0)  # Tenta IP Camera primeiro
     if not video.isOpened():
         print("DEBUG: Tentando webcam 1...")
         video = cv2.VideoCapture(1)
@@ -583,6 +838,7 @@ def main():
             continue
 
         # --- Fase de Scan ---
+        # (Nenhuma alteração nesta seção)
         if not scan_complete:
             if current_face_index >= len(faces_order):
                 print("DEBUG: Erro - Índice de face inválido. Reiniciando scan.")
@@ -760,6 +1016,8 @@ def main():
                     print(f"Debug: Erro menor ao tentar desenhar letras em detecção inválida: {e_draw}")
 
         # --- Fase de Resolução Interativa ---
+        # (Nenhuma alteração nesta seção, pois a lógica foi movida
+        #  para as funções 'handle_back' e o dicionário 'move_functions')
         elif current_move_index < len(solution_moves):
             move = solution_moves[current_move_index]
             move_func = move_functions.get(move)
@@ -773,19 +1031,23 @@ def main():
                     print("DEBUG: ERRO CRÍTICO - Estado numérico incompleto antes de aplicar movimento!")
                     break
 
+                # Esta impressão agora mostrará 'B', 'B'' ou 'B2' corretamente.
                 print(f"\nDEBUG: Chamando função para movimento {move} ({current_move_index+1}/{len(solution_moves)})")
+                
+                # A move_func será a 'handle_back_cw' (por exemplo) se move == 'B'
                 new_u, new_r, new_f, new_d, new_l, new_b = move_func(
                     video, current_u, current_r, current_f, current_d, current_l, current_b,
                     kociemba_letter_to_num,
                     grid_centers[0][0] - 70, grid_centers[0][1] - 70, 70, 70
                 )
 
-                # Verifica interrupção
+                # Verifica interrupção (a função wrapper handle_back JÁ retorna o estado
+                # original (current_u, ...) se for interrompida em qualquer etapa)
                 interrupted = (np.array_equal(new_u, current_u) and np.array_equal(new_r, current_r) and
                                np.array_equal(new_f, current_f) and np.array_equal(new_d, current_d) and
                                np.array_equal(new_l, current_l) and np.array_equal(new_b, current_b))
 
-                if interrupted and move_func != wait_for_move:
+                if interrupted: # A checagem de 'wait_for_move' é desnecessária
                     print("DEBUG: Execução interrompida pelo usuário ('q').")
                     break
 
