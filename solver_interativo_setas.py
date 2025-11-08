@@ -146,13 +146,6 @@ def detect_face_from_webcam(frame, centers, color_map):
         # Converte letra para número usando o mapa criado no scan
         color_num = color_map.get(color_letter) # Pega o número associado à letra
         if color_num is None: # Verifica se a letra realmente existe no mapa
-            # É NORMAL dar erro aqui durante o scan, pois o mapa ainda não está completo
-            # print(f"DEBUG: ERRO (Esperado no Scan) - Cor '{color_letter}' não está no mapeamento 'kociemba_letter_to_num'.")
-            # print("DEBUG: Mapeamento atual:", kociemba_letter_to_num)
-            # Retorna None SE ESTIVER NA FASE DE RESOLUÇÃO, mas não no scan
-            # No entanto, a função detect_face_from_webcam só é chamada com color_map
-            # preenchido DURANTE a resolução. Durante o scan, usamos outra lógica.
-            # Se chegou aqui na RESOLUÇÃO, é um erro grave.
              print(f"DEBUG: ERRO CRÍTICO no Mapeamento durante RESOLUÇÃO - Cor '{color_letter}' (HSV={pixel_hsv}) detectada em ({x},{y}), mas não está no mapeamento 'kociemba_letter_to_num'.")
              print("DEBUG: Mapeamento:", kociemba_letter_to_num)
              return None # Retorna None se o mapeamento falhar durante a resolução
@@ -296,8 +289,15 @@ arrows = {
             ((center_points[2][0], center_points[2][1]-10), (center_points[0][0]+10, center_points[0][1])),
             ((center_points[8][0]-10, center_points[8][1]), (center_points[2][0], center_points[2][1]+10)) ],
      "B": [], "B'": [], "B2": [],
-     "TURN_R": [ (center_points[8], center_points[6]), (center_points[5], center_points[3]), (center_points[2], center_points[0]) ],
-     "TURN_L": [ (center_points[6], center_points[8]), (center_points[3], center_points[5]), (center_points[0], center_points[2]) ],
+     
+     # --- ADIÇÃO DAS SETAS DE ROTAÇÃO ---
+     "TURN_R": [ # Setas para "Vire para Direita" (Y)
+         (center_points[0], center_points[2]), (center_points[3], center_points[5]), (center_points[6], center_points[8])
+     ],
+     "TURN_L": [ # Setas para "Vire para Esquerda" (Y')
+         (center_points[2], center_points[0]), (center_points[5], center_points[3]), (center_points[8], center_points[6])
+     ],
+     # --- FIM DA ADIÇÃO ---
 }
 
 # --- Funções de Rotação Lógica (Modificadas para checar Nones) ---
@@ -486,42 +486,64 @@ def back_ccw(video, u, r, f, d, l, b, *args):
     else: return u, r, f, d, l, b
 
 
-# Funções para virar o cubo inteiro (simplificado)
-def turn_cube_Y(video, u, r, f, d, l, b, *args):
-    if any(face is None for face in [u, r, f, d, l, b]): print("DEBUG: turn_Y recebeu None."); return u, r, f, d, l, b
-    print("Vire o cubo todo para a DIREITA (Y)")
-    new_f, new_r, new_b, new_l = l, f, r, b
-    rotated_u = rotate_cw(u)
-    rotated_d = rotate_ccw(d)
-    if rotated_u is None or rotated_d is None: print("DEBUG: rotação U/D falhou em turn_Y."); return u, r, f, d, l, b
-    new_u, new_d = rotated_u, rotated_d
-    print("Mostre a nova FACE FRONTAL (que era a Esquerda)")
-    if wait_for_move(video, new_f, l, "VIRAR P/ DIREITA: Mostre a nova face F", arrows["TURN_R"]):
-        return new_u, new_r, new_f, new_d, new_l, new_b
-    else: return u, r, f, d, l, b
-
-
-def turn_cube_Y_prime(video, u, r, f, d, l, b, *args):
-    if any(face is None for face in [u, r, f, d, l, b]): print("DEBUG: turn_Y' recebeu None."); return u, r, f, d, l, b
-    print("Vire o cubo todo para a ESQUERDA (Y')")
-    new_f, new_l, new_b, new_r = r, f, l, b
+# --- FUNÇÕES DE ROTAÇÃO DO CUBO (Y) ---
+# (Estas são as novas funções que implementam a lógica do "cara")
+def turn_cube_Y_prime(video, u, r, f, d, l, b, *args): # Virar para Esquerda (Y')
+    """ Pede ao usuário para virar o cubo para a esquerda (nova F = antiga R) """
+    print("VIRE O CUBO P/ ESQUERDA (Y')")
+    
+    # O estado 'anterior' que a câmera vê é a face F atual
+    f_before = np.copy(f) 
+    # O estado 'esperado' que a câmera DEVE VER é a antiga face R
+    expected_f = np.copy(r) 
+    
+    # Calcula o estado lógico completo após a rotação Y'
+    new_f, new_l, new_b, new_r = r, f, l, b # R->F, F->L, L->B, B->R
     rotated_u = rotate_ccw(u)
     rotated_d = rotate_cw(d)
-    if rotated_u is None or rotated_d is None: print("DEBUG: rotação U/D falhou em turn_Y'."); return u, r, f, d, l, b
+    if rotated_u is None or rotated_d is None: return u, r, f, d, l, b
     new_u, new_d = rotated_u, rotated_d
-    print("Mostre a nova FACE FRONTAL (que era a Direita)")
-    if wait_for_move(video, new_f, r, "VIRAR P/ ESQUERDA: Mostre a nova face F", arrows["TURN_L"]):
+    
+    # Chama wait_for_move para VERIFICAR a rotação
+    # Espera até que a câmera veja a antiga face R como a nova face F
+    if wait_for_move(video, expected_f, f_before, "VIRE P/ ESQUERDA (mostre a face R)", arrows["TURN_L"]):
         return new_u, new_r, new_f, new_d, new_l, new_b
-    else: return u, r, f, d, l, b
+    else: 
+        return u, r, f, d, l, b # Retorna original se 'q' for pressionado
+
+def turn_cube_Y(video, u, r, f, d, l, b, *args): # Virar para Direita (Y)
+    """ Pede ao usuário para virar o cubo para a direita (nova F = antiga L) """
+    print("VIRE O CUBO P/ DIREITA (Y)")
+    
+    # O estado 'anterior' que a câmera vê é a face F atual
+    f_before = np.copy(f)
+    # O estado 'esperado' que a câmera DEVE VER é a antiga face L
+    expected_f = np.copy(l) 
+    
+    # Calcula o estado lógico completo após a rotação Y
+    new_f, new_r, new_b, new_l = l, f, r, b # L->F, F->R, R->B, B->L
+    rotated_u = rotate_cw(u)
+    rotated_d = rotate_ccw(d)
+    if rotated_u is None or rotated_d is None: return u, r, f, d, l, b
+    new_u, new_d = rotated_u, rotated_d
+    
+    # Espera até que a câmera veja a antiga face L como a nova face F
+    if wait_for_move(video, expected_f, f_before, "VIRE P/ DIREITA (mostre a face L)", arrows["TURN_R"]):
+        return new_u, new_r, new_f, new_d, new_l, new_b
+    else: 
+        return u, r, f, d, l, b # Retorna original se 'q'
+# --- FIM DAS FUNÇÕES DE ROTAÇÃO Y ---
+
 
 # Mapeamento de strings de movimento para funções
+# Removido 'B', 'B'', 'B2' daqui pois serão tratados no loop main
 move_functions = {
     "R": right_cw, "R'": right_ccw,
     "L": left_cw,  "L'": left_ccw,
     "U": up_cw,    "U'": up_ccw,
     "D": down_cw,  "D'": down_ccw,
     "F": front_cw, "F'": front_ccw,
-    "B": back_cw,  "B'": back_ccw,
+    # "B": back_cw,  "B'": back_ccw, # REMOVIDO - SERÁ TRATADO NO MAIN
 }
 # Adiciona movimentos duplos (X2) dinamicamente
 for move in list(move_functions.keys()):
@@ -745,46 +767,117 @@ def main():
                        print(f"Debug: Erro menor ao tentar desenhar letras em detecção inválida: {e_draw}")
              # --- Fim das Modificações ---
 
-        # --- Fase de Resolução Interativa ---
+        # --- Fase de Resolução Interativa (MODIFICADA) ---
         elif current_move_index < len(solution_moves):
              move = solution_moves[current_move_index]
-             move_func = move_functions.get(move)
+             
+             # Pega os argumentos comuns para as funções
+             current_u = cube_state_num.get('U'); current_r = cube_state_num.get('R')
+             current_f = cube_state_num.get('F'); current_d = cube_state_num.get('D')
+             current_l = cube_state_num.get('L'); current_b = cube_state_num.get('B')
+             
+             if any(face is None for face in [current_u, current_r, current_f, current_d, current_l, current_b]):
+                  print("DEBUG: ERRO CRÍTICO - Estado numérico incompleto antes de aplicar movimento!")
+                  break
+                  
+             # --- LÓGICA DE INTERCEPTAÇÃO DE 'B' ---
+             interrupted = False
+             new_u, new_r, new_f, new_d, new_l, new_b = current_u, current_r, current_f, current_d, current_l, current_b
 
-             if move_func:
-                 current_u = cube_state_num.get('U'); current_r = cube_state_num.get('R')
-                 current_f = cube_state_num.get('F'); current_d = cube_state_num.get('D')
-                 current_l = cube_state_num.get('L'); current_b = cube_state_num.get('B')
+             # Argumentos genéricos para as funções de movimento
+             move_args = (video, current_u, current_r, current_f, current_d, current_l, current_b,
+                          kociemba_letter_to_num,
+                          grid_centers[0][0] - 70, grid_centers[0][1] - 70, 70, 70)
 
-                 if any(face is None for face in [current_u, current_r, current_f, current_d, current_l, current_b]):
-                      print("DEBUG: ERRO CRÍTICO - Estado numérico incompleto antes de aplicar movimento!")
-                      break
+             print(f"\nDEBUG: Processando movimento {move} ({current_move_index+1}/{len(solution_moves)})")
 
-                 print(f"\nDEBUG: Chamando função para movimento {move} ({current_move_index+1}/{len(solution_moves)})")
-                 new_u, new_r, new_f, new_d, new_l, new_b = move_func(
-                     video, current_u, current_r, current_f, current_d, current_l, current_b,
-                     kociemba_letter_to_num,
-                     grid_centers[0][0] - 70, grid_centers[0][1] - 70, 70, 70
-                 )
-
-                 # Verifica interrupção
-                 interrupted = (np.array_equal(new_u, current_u) and np.array_equal(new_r, current_r) and
-                                np.array_equal(new_f, current_f) and np.array_equal(new_d, current_d) and
-                                np.array_equal(new_l, current_l) and np.array_equal(new_b, current_b))
-
-                 if interrupted and move_func != wait_for_move:
-                     print("DEBUG: Execução interrompida pelo usuário ('q').")
-                     break
+             if move == "B":
+                 # B = Y' -> R' -> Y (Lógica corrigida, B é R' na face oposta)
+                 print("DEBUG: Movimento 'B'. Rotacionando Y'...")
+                 new_u, new_r, new_f, new_d, new_l, new_b = turn_cube_Y_prime(*move_args)
+                 if np.array_equal(new_f, current_f): interrupted = True
+                 
+                 if not interrupted:
+                      print("DEBUG: ...Rotacionado. Executando R'...")
+                      move_args_step2 = (video, new_u, new_r, new_f, new_d, new_l, new_b, *move_args[7:])
+                      new_u, new_r, new_f, new_d, new_l, new_b = right_ccw(*move_args_step2) # R'
+                      if np.array_equal(new_f, move_args_step2[3]): interrupted = True
+                 
+                 if not interrupted:
+                      print("DEBUG: ...Movimento R' feito. Rotacionando Y...")
+                      move_args_step3 = (video, new_u, new_r, new_f, new_d, new_l, new_b, *move_args[7:])
+                      new_u, new_r, new_f, new_d, new_l, new_b = turn_cube_Y(*move_args_step3)
+                      if np.array_equal(new_f, move_args_step3[3]): interrupted = True
+             
+             elif move == "B'":
+                 # B' = Y' -> R -> Y
+                 print("DEBUG: Movimento 'B''. Rotacionando Y'...")
+                 new_u, new_r, new_f, new_d, new_l, new_b = turn_cube_Y_prime(*move_args)
+                 if np.array_equal(new_f, current_f): interrupted = True
 
                  if not interrupted:
-                     cube_state_num['U'] = new_u; cube_state_num['R'] = new_r
-                     cube_state_num['F'] = new_f; cube_state_num['D'] = new_d
-                     cube_state_num['L'] = new_l; cube_state_num['B'] = new_b
-                     current_move_index += 1
-                     print(f"DEBUG: Movimento {move} concluído.")
+                      print("DEBUG: ...Rotacionado. Executando R...")
+                      move_args_step2 = (video, new_u, new_r, new_f, new_d, new_l, new_b, *move_args[7:])
+                      new_u, new_r, new_f, new_d, new_l, new_b = right_cw(*move_args_step2) # R
+                      if np.array_equal(new_f, move_args_step2[3]): interrupted = True
+
+                 if not interrupted:
+                      print("DEBUG: ...Movimento R feito. Rotacionando Y...")
+                      move_args_step3 = (video, new_u, new_r, new_f, new_d, new_l, new_b, *move_args[7:])
+                      new_u, new_r, new_f, new_d, new_l, new_b = turn_cube_Y(*move_args_step3)
+                      if np.array_equal(new_f, move_args_step3[3]): interrupted = True
+
+             elif move == "B2":
+                 # B2 = Y' -> R2 -> Y
+                 print("DEBUG: Movimento 'B2'. Rotacionando Y'...")
+                 new_u, new_r, new_f, new_d, new_l, new_b = turn_cube_Y_prime(*move_args)
+                 if np.array_equal(new_f, current_f): interrupted = True
+
+                 if not interrupted:
+                      print("DEBUG: ...Rotacionado. Executando R2 (1/2)...")
+                      move_args_step2 = (video, new_u, new_r, new_f, new_d, new_l, new_b, *move_args[7:])
+                      new_u, new_r, new_f, new_d, new_l, new_b = right_cw(*move_args_step2) # R (1)
+                      if np.array_equal(new_f, move_args_step2[3]): interrupted = True
+
+                 if not interrupted:
+                      print("DEBUG: ...Movimento R (1/2) feito. Executando R2 (2/2)...")
+                      move_args_step3 = (video, new_u, new_r, new_f, new_d, new_l, new_b, *move_args[7:])
+                      new_u, new_r, new_f, new_d, new_l, new_b = right_cw(*move_args_step3) # R (2)
+                      if np.array_equal(new_f, move_args_step3[3]): interrupted = True
+                 
+                 if not interrupted:
+                      print("DEBUG: ...Movimento R2 feito. Rotacionando Y...")
+                      move_args_step4 = (video, new_u, new_r, new_f, new_d, new_l, new_b, *move_args[7:])
+                      new_u, new_r, new_f, new_d, new_l, new_b = turn_cube_Y(*move_args_step4)
+                      if np.array_equal(new_f, move_args_step4[3]): interrupted = True
 
              else:
-                 print(f"DEBUG: Erro - Movimento '{move}' desconhecido.")
-                 current_move_index += 1
+                 # --- LÓGICA ANTIGA (Para movimentos F, R, L, U, D) ---
+                 move_func = move_functions.get(move)
+                 if move_func:
+                     new_u, new_r, new_f, new_d, new_l, new_b = move_func(*move_args)
+                     # Verifica interrupção
+                     if (np.array_equal(new_u, current_u) and np.array_equal(new_r, current_r) and
+                         np.array_equal(new_f, current_f) and np.array_equal(new_d, current_d) and
+                         np.array_equal(new_l, current_l) and np.array_equal(new_b, current_b)):
+                         if move_func != wait_for_move: interrupted = True
+                 else:
+                     print(f"DEBUG: Erro - Movimento '{move}' desconhecido.")
+                     interrupted = True # Pula movimento desconhecido
+             
+             # --- FIM DA LÓGICA DE INTERCEPTAÇÃO ---
+
+             if interrupted:
+                 print("DEBUG: Execução interrompida pelo usuário ('q') ou movimento desconhecido.")
+                 break # Sai do loop principal
+
+             # Atualiza o estado global
+             cube_state_num['U'] = new_u; cube_state_num['R'] = new_r
+             cube_state_num['F'] = new_f; cube_state_num['D'] = new_d
+             cube_state_num['L'] = new_l; cube_state_num['B'] = new_b
+             current_move_index += 1
+             print(f"DEBUG: Movimento {move} concluído.")
+
         else: # Fim da solução
              print("DEBUG: Fim da solução.")
              cv2.putText(frame_with_grid, "CUBO RESOLVIDO!", (frame.shape[1] // 2 - 150, frame.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
