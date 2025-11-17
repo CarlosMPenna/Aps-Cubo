@@ -24,8 +24,6 @@ try:
              print("O programa pode falhar se uma cor estiver faltando.")
              print("Cores carregadas:", list(color_ranges.keys()))
              print("!!! ATENCAO !!!\n")
-             # time.sleep(5) # Pausa para ler
-             # exit() # Descomente para sair se faltar cor
         else:
             print("DEBUG: Arquivo 'calibrated_colors.py' contem 6 cores.") # DEBUG 2.1
 
@@ -140,7 +138,6 @@ def detect_face_from_webcam(frame, centers, color_map):
         detected_colors_letters.append(color_letter)
 
         if color_letter == '?':
-            # print(f"DEBUG: Cor não detectada em ({x},{y}), HSV={pixel_hsv}") # Muito verbose
             return None # Falha na detecção
 
         # Converte letra para número usando o mapa criado no scan
@@ -183,8 +180,6 @@ print("DEBUG: Definindo Funções Interativas...") # DEBUG 5
 
 def wait_for_move(video, expected_front_face, state_before_front, move_name, arrow_coords):
     print(f"DEBUG: Entrou em wait_for_move para {move_name}")
-    # print(f"DEBUG: Esperando face: {expected_front_face}") # Muito verbose
-    # print(f"DEBUG: Estado anterior: {state_before_front}") # Muito verbose
 
     if expected_front_face is None:
          print("DEBUG: ERRO - expected_front_face é None em wait_for_move.")
@@ -243,7 +238,6 @@ def wait_for_move(video, expected_front_face, state_before_front, move_name, arr
 
             # Desenha seta se estiver no estado anterior
             elif len(detected_faces_buffer) >= 1 and state_before_front is not None and np.array_equal(np.array(detected_faces_buffer[-1]), state_before_front):
-                 # print("DEBUG: Estado anterior detectado, desenhando seta.") # Muito verbose
                  for p1, p2 in arrow_coords:
                      try: # Adiciona try-except para desenho da seta
                          p1_int = (int(p1[0]), int(p1[1]))
